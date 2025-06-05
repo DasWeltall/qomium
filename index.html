@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qomium</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        :root {
+            /* Qomium Farbpalette & Schattierungen */
+            --primary-font: 'Google Sans', Arial, sans-serif;
+            --background-dark: #1A1A1A; /* Noch dunklerer Hintergrund für Kontrast */
+            --surface-dark: #2C2C2C; /* Hintergrund für Karten/Elemente */
+            --text-light: #E0E0E0; /* Heller Text auf dunklem Grund */
+            --text-muted: #A0A0A0; /* Gedämpfter Text/Placeholder */
+            --outline-color: #444444; /* Dezente Ränder */
+
+            /* Akzentfarben aus dem Gemini-Verlauf */
+            --gemini-blue: #73A5FF;
+            --gemini-purple: #B28DFF;
+            --gemini-pink: #FF8FCD;
+            --gemini-orange: #FFD06B;
+            --gemini-cyan: #6DD0DB;
+
+            /* Interaktive Farben */
+            --accent-glow: #8ab4f8; /* Blau für aktive Elemente/Fokus */
+            --button-icon: #A0A0A0; /* Standard Icon Farbe */
+            --button-icon-hover: #E0E0E0; /* Icon Farbe bei Hover */
+            --button-bg-hover: rgba(255, 255, 255, 0.08); /* Dezenter Button-Hover */
+            --suggestion-hover-bg: rgba(255, 255, 255, 0.05); /* Hintergrund bei Hover für Vorschläge */
+
+            /* Schatten und Glow */
+            --shadow-subtle: 0 1px 3px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.12);
+            --shadow-active: 0 0 20px rgba(0,0,0,0.7); /* Intensiverer Schatten bei Aktivität */
+            --glow-gradient: linear-gradient(60deg,
+                var(--gemini-blue),
+                var(--gemini-purple),
+                var(--gemini-pink),
+                var(--gemini-orange),
+                var(--gemini-cyan),
+                var(--gemini-blue)
+            );
+
+            --microphone-color: var(--button-icon);
+            --microphone-recording-color: #F00; /* Rot für Aufnahme */
+        }
+
+        body {
+            font-family: var(--primary-font);
+            background-color: var(--background-dark);
+            color: var(--text-light);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center; /* Zentriert den Inhalt vertikal */
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow: hidden; /* Verhindert Scrollbalken durch den animierten Glow */
+        }
+
+        /* --- Header / Einstellungen --- */
+        .page-header {
+            position: fixed; /* Fixiert den Header */
+            top: 25px;
+            right: 30px;
+            z-index: 100;
+        }
+
+        .settings-button-wrapper {
+            position: relative; /* Für das Dropdown */
+            display: inline-block; /* Damit der Button nur seinen Inhalt umrahmt */
+        }
+
+        .settings-button {
+            background: none;
+            border: none;
+            color: var(--button-icon);
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+        }
+
+        .settings-button:hover {
+            background-color: var(--button-bg-hover);
+            color: var(--button-icon-hover);
+        }
+
+        .settings-button .material-icons {
+            font-size: 26px;
+        }
+
+        .settings-dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: var(--surface-dark);
+            min-width: 180px;
+            box-shadow: var(--shadow-subtle);
+            border-radius: 10px;
+            right: 0;
+            top: 100%; /* Unter dem Button */
+            margin-top: 10px; /* Abstand zum Button */
+            overflow: hidden;
+            z-index: 90; /* Unter dem Header, aber über dem Rest */
+            border: 1px solid var(--outline-color);
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+        }
+
+        .settings-dropdown-content.visible {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .settings-dropdown-content a {
+            color: var(--text-light);
+            padding: 12px 16px;
+            text-decoration: none;
+            display: block;
+            text-align: left;
+            transition: background-color 0.2s ease-in-out;
+            font-size: 15px;
+        }
+
+        .settings-dropdown-content a:hover {
+            background-color: var(--button-bg-hover);
+        }
+
+        /* --- Zentrierter Hauptinhalt --- */
+        .centered-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center; /* Wichtig für vertikale Zentrierung in Body */
+            text-align: center;
+            width: 100%;
+            max-width: 650px; /* Max. Breite für den gesamten Inhaltsbereich */
+            position: relative; /* Für die Positionierung der Vorschläge */
+        }
+
+        .logo-text {
+            font-size: 72px; /* Etwas größer für mehr Präsenz */
+            font-weight: 500;
+            color: var(--text-light);
+            margin-bottom: 50px; /* Mehr Abstand zur Suchleiste */
+            letter-spacing: -1.5px; /* Etwas enger */
+            transition: color 0.3s ease;
+        }
+
+        /* --- Suchbereich --- */
+        .search-area {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            position: relative; /* Für die Positionierung der Vorschläge */
+            z-index: 10; /* Stellt sicher, dass das Suchfeld über den Vorschlägen liegt */
+        }
+
+        #search-glow-container {
+            padding: 3px; /* Dicke des Glow-Rahmens */
+            border-radius: 32px; /* Etwas größer als vorher */
+            background: transparent;
+            transition: background 0.4s ease-out, box-shadow 0.4s ease-out; /* Übergang für Schatten */
+            width: 100%;
+            box-sizing: border-box;
+            box-shadow: var(--shadow-subtle); /* Dezenter Schatten im Ruhezustand */
+            position: relative; /* Für absolute Positionierung der Vorschläge */
+        }
+
+        #search-glow-container.glow-active {
+            background-size: 300% 300%;
+            animation: gradientAnimation 5s ease infinite;
+            background-image: var(--glow-gradient);
+            box-shadow: var(--shadow-active); /* Intensiverer Schatten bei Aktivität */
+        }
+
+        .search-wrapper {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            background-color: var(--surface-dark);
+            border-radius: 29px; /* (glow-container radius - padding) */
+            border: 1px solid var(--outline-color); /* Dezenter Rand */
+            box-sizing: border-box;
+            overflow: hidden;
+            transition: border-color 0.3s ease;
+        }
+
+        #search-glow-container.glow-active .search-wrapper {
+            border-color: transparent; /* Lässt den Glow nahtlos erscheinen */
+        }
+
+        #search-input {
+            flex-grow: 1;
+            border: none; /* Wichtig: Keine Standard-Umrandung */
+            background-color: transparent;
+            color: var(--text-light);
+            font-size: 18px; /* Etwas größere Schrift */
+            padding: 16px 20px; /* Mehr Polsterung */
+            outline: none; /* Wichtig: Entfernt den Standard-Fokus-Rahmen des Browsers */
+            transition: color 0.3s ease;
+        }
+
+        #search-input::placeholder {
+            color: var(--text-muted);
+            transition: color 0.3s ease;
+        }
+
+        /* Buttons im Suchfeld */
+        .search-button-container {
+            display: flex;
+            align-items: center;
+            margin-right: 8px; /* Abstand zum Rand des Suchfeldes */
+        }
+
+        .search-button {
+            background: none;
+            border: none;
+            color: var(--button-icon);
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+            flex-shrink: 0;
+            width: 38px;
+            height: 38px;
+        }
+
+        .search-button:hover {
+            background-color: var(--button-bg-hover);
+            color: var(--button-icon-hover);
+        }
+
+        .search-button .material-icons {
+            font-size: 20px;
+        }
+
+        /* Spezifische Anpassung für Löschen-Button */
+        .clear-button {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .clear-button.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Spezifische Anpassung für Spracheingabe-Button */
+        .voice-input-button .material-icons {
+            color: var(--microphone-color);
+            transition: color 0.2s ease-in-out;
+        }
+
+        .voice-input-button.recording .material-icons {
+            color: var(--microphone-recording-color);
+            animation: pulse 1s infinite alternate; /* Pulsierender Effekt beim Aufnehmen */
+        }
+
+        @keyframes pulse {
+            from { transform: scale(1); opacity: 1; }
+            to { transform: scale(1.1); opacity: 0.8; }
+        }
+
+        /* Spezifische Anpassung für Submit-Button (Pfeil) */
+        #submit-button {
+            color: var(--accent-glow);
+            width: 48px; /* Größerer Button */
+            height: 48px;
+            margin-left: 5px; /* Abstand zum vorherigen Button */
+        }
+
+        #submit-button .material-icons {
+            font-size: 26px;
+            transition: transform 0.2s ease-out;
+        }
+
+        #submit-button:hover .material-icons {
+            transform: translateX(3px);
+        }
+
+        /* --- Suchvorschläge --- */
+        #suggestions-container {
+            position: absolute;
+            top: calc(100% + 15px); /* Position unterhalb des Suchfeldes + Abstand */
+            left: 0;
+            right: 0;
+            background: var(--glow-gradient); /* Farbverlauf wie der Glow */
+            background-size: 200% 200%;
+            animation: gradientAnimation 5s ease infinite;
+            border-radius: 20px; /* Abgerundete Ecken für den Container */
+            box-shadow: var(--shadow-active); /* Passender Schatten */
+            overflow: hidden; /* Stellt sicher, dass Inhalte nicht über den Rand ragen */
+            z-index: 5; /* Unter dem Suchfeld, aber über dem Rest der Seite */
+            display: none; /* Standardmäßig ausgeblendet */
+            opacity: 0;
+            transform: translateY(-10px); /* Leichter Startversatz für Animation */
+            transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+            padding: 3px; /* Polsterung für den Gradienten-Rahmen */
+        }
+
+        #suggestions-container.visible {
+            display: block; /* Anzeigen */
+            opacity: 1;
+            transform: translateY(0); /* Animation zu normaler Position */
+        }
+
+        .suggestions-inner {
+            background-color: var(--surface-dark); /* Hintergrund der Vorschläge */
+            border-radius: 17px; /* (Container-Radius - Padding) */
+            overflow: hidden;
+            border: 1px solid transparent; /* Für konsistente Rahmenstärke */
+        }
+
+        .suggestion-item {
+            padding: 12px 20px;
+            font-size: 16px;
+            color: var(--text-light);
+            cursor: pointer;
+            text-align: left; /* Text linksbündig */
+            transition: background-color 0.2s ease-in-out;
+        }
+
+        .suggestion-item:hover {
+            background-color: var(--suggestion-hover-bg); /* Hintergrund bei Hover */
+        }
+
+        .suggestion-item:not(:last-child) {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05); /* Dezente Trennlinie */
+        }
+
+        /* --- Animationen --- */
+        @keyframes gradientAnimation {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* --- Responsivität --- */
+        @media (max-width: 768px) {
+            .logo-text {
+                font-size: 50px;
+                margin-bottom: 40px;
+            }
+
+            .search-input {
+                font-size: 16px;
+                padding: 12px 15px;
+            }
+
+            #submit-button {
+                width: 44px;
+                height: 44px;
+            }
+
+            #submit-button .material-icons {
+                font-size: 24px;
+            }
+
+            .search-button {
+                width: 34px;
+                height: 34px;
+            }
+
+            .search-button .material-icons {
+                font-size: 18px;
+            }
+
+            #suggestions-container {
+                top: calc(100% + 10px);
+            }
+
+            .page-header {
+                right: 20px;
+            }
+            .settings-dropdown-content {
+                right: 0; /* Bleibt rechtsbündig */
+            }
+        }
+
+        @media (max-width: 480px) {
+            .logo-text {
+                font-size: 40px;
+                margin-bottom: 30px;
+            }
+
+            body {
+                padding: 15px;
+            }
+
+            .page-header {
+                top: 15px;
+                right: 15px;
+            }
+        }
+
+        /* Google Sans Font (wie zuvor) */
+        /* Add to your existing <style> block */
+    #ai-summary-container {
+        margin-top: 25px; /* Increased margin */
+        padding: 20px;    /* Increased padding */
+        background-color: var(--surface-dark);
+        border-radius: 18px; /* Slightly more rounded */
+        box-shadow: var(--shadow-subtle);
+        display: none; /* Initially hidden */
+        text-align: left;
+        border: 1px solid var(--outline-color); /* Add a subtle border */
+    }
+
+    #ai-summary-container h3 { /* Style for the "AI Zusammenfassung" heading */
+        margin-top: 0;
+        margin-bottom: 15px; /* More space below heading */
+        color: var(--gemini-cyan);
+        font-size: 18px; /* Slightly larger heading */
+        border-bottom: 1px solid var(--outline-color); /* Separator line */
+        padding-bottom: 10px;
+    }
+
+    #ai-summary-content {
+        font-size: 15px;
+        line-height: 1.7; /* Improved line height for readability */
+        color: var(--text-light); /* Ensure good contrast */
+    }
+
+    #ai-summary-content p { /* If summary includes <p> tags from more complex content */
+        margin-bottom: 10px;
+    }
+
+    #ai-summary-loading,
+    #ai-summary-error {
+        font-size: 14px;
+        padding: 10px;
+        border-radius: 8px; /* Rounded corners for messages */
+        margin-top: 10px;
+    }
+
+    #ai-summary-loading {
+        color: var(--text-muted);
+        background-color: rgba(255, 255, 255, 0.03); /* Subtle background */
+    }
+
+    #ai-summary-error {
+        color: var(--gemini-pink);
+        background-color: rgba(255, 143, 205, 0.1); /* Subtle pink background for errors */
+    }
+
+        @font-face {
+          font-family: 'Google Sans';
+          font-style: normal;
+          font-weight: 400; /* Regular */
+          src: local('Google Sans Regular'), local('GoogleSans-Regular'),
+               url(https://fonts.gstatic.com/s/googlesans/v27/4UaGrENHsxJlGDuGo1OIlL3Kwp5MKg.woff2) format('woff2');
+          unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+        }
+        @font-face {
+          font-family: 'Google Sans';
+          font-style: normal;
+          font-weight: 500; /* Medium */
+          src: local('Google Sans Medium'), local('GoogleSans-Medium'),
+               url(https://fonts.gstatic.com/s/googlesans/v27/4UabrENHsxJlGDuGo1OIlLV154s3gjN0.woff2) format('woff2');
+          unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+        }
+    </style>
+</head>
+<body>
+    <header class="page-header">
+        <div class="settings-button-wrapper">
+            <button class="settings-button" id="settings-button" title="Einstellungen">
+                <span class="material-icons">settings</span>
+            </button>
+            <div class="settings-dropdown-content" id="settings-dropdown-content">
+                <a href="#">Sprache ändern</a>
+                <a href="#">Theme wechseln</a>
+                <a href="#">Privatsphäre</a>
+                <a href="#">Hilfe</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="centered-content">
+        <div class="logo-text">Qomium</div>
+        <div class="search-area">
+            <div id="search-glow-container">
+                <div class="search-wrapper">
+                    <input type="text" id="search-input" placeholder="Frag Qomium...">
+                    <div class="search-button-container">
+                        <button class="search-button clear-button" id="clear-search-button" title="Text löschen">
+                            <span class="material-icons">close</span>
+                        </button>
+                        <button class="search-button voice-input-button" id="voice-input-button" title="Spracheingabe">
+                            <span class="material-icons">mic</span>
+                        </button>
+                        <button class="search-button" id="submit-button" title="Suchen">
+                            <span class="material-icons">arrow_forward</span>
+                        </button>
+                    </div>
+                </div>
+                <div id="suggestions-container">
+                    <div class="suggestions-inner" id="suggestions-inner">
+                        </div>
+                </div>
+            </div>
+            <div id="ai-summary-container" style="margin-top: 20px; padding: 15px; background-color: var(--surface-dark); border-radius: 15px; box-shadow: var(--shadow-subtle); display: none; text-align: left;">
+                <h3 style="margin-top: 0; color: var(--gemini-cyan);">AI Zusammenfassung</h3>
+                <div id="ai-summary-content" style="font-size: 15px; line-height: 1.6;">
+                    <!-- AI summary will be loaded here -->
+                </div>
+                <p id="ai-summary-loading" style="color: var(--text-muted); display: none;">Zusammenfassung wird geladen...</p>
+                <p id="ai-summary-error" style="color: var(--gemini-pink); display: none;">Fehler beim Erstellen der Zusammenfassung.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const searchInput = document.getElementById('search-input');
+        const searchGlowContainer = document.getElementById('search-glow-container');
+        const searchWrapper = document.querySelector('.search-wrapper');
+        const clearSearchButton = document.getElementById('clear-search-button');
+        const voiceInputButton = document.getElementById('voice-input-button');
+        const submitButton = document.getElementById('submit-button');
+        const suggestionsContainer = document.getElementById('suggestions-container');
+        const suggestionsInner = document.getElementById('suggestions-inner');
+        const settingsButton = document.getElementById('settings-button');
+        const settingsDropdownContent = document.getElementById('settings-dropdown-content');
+        const aiSummaryContainer = document.getElementById('ai-summary-container');
+        const aiSummaryContent = document.getElementById('ai-summary-content');
+        const aiSummaryLoading = document.getElementById('ai-summary-loading');
+        const aiSummaryError = document.getElementById('ai-summary-error');
+
+        const initialPlaceholder = searchInput.placeholder;
+        const typingPlaceholder = "Tippe deine Frage hier...";
+        const focusedPlaceholder = "Bereit für deine Eingabe...";
+        const listeningPlaceholder = "Ich höre zu...";
+
+        let debounceTimeout;
+        let isSearchInputFocused = false; // Zustand, ob das Suchfeld fokussiert ist
+        let recognition; // Für Web Speech API
+
+        // --- Funktionen für Suchfeld und Vorschläge ---
+        function updateSearchState() {
+            // Glow-Effekt nur wenn Text vorhanden ODER Suchfeld fokussiert ist
+            if (searchInput.value.length > 0 || isSearchInputFocused) {
+                searchGlowContainer.classList.add('glow-active');
+            } else {
+                searchGlowContainer.classList.remove('glow-active');
+            }
+
+            // Löschen-Button anzeigen/verbergen
+            if (searchInput.value.length > 0) {
+                clearSearchButton.classList.add('visible');
+            } else {
+                clearSearchButton.classList.remove('visible');
+            }
+
+            // Vorschläge anzeigen/verbergen
+            // Zeigt Vorschläge nur an, wenn Suchfeld fokussiert, nicht leer UND Vorschläge vorhanden sind
+            if (isSearchInputFocused && searchInput.value.length > 0 && suggestionsInner.hasChildNodes()) {
+                suggestionsContainer.classList.add('visible');
+            } else {
+                suggestionsContainer.classList.remove('visible');
+            }
+        }
+
+        async function fetchSearxResults(query) {
+            if (query.trim() === '') {
+                suggestionsInner.innerHTML = '';
+                updateSearchState();
+                return;
+            }
+
+            const url = `https://searx.nixnet.services/search?q=${encodeURIComponent(query)}&format=json&language=de`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                const results = data.results;
+
+                displaySearxResults(results);
+            } catch (error) {
+                console.error('Fehler beim Abrufen der Suchergebnisse:', error);
+                // Zeigt Fehlermeldung nur, wenn der Container noch sichtbar ist
+                if (isSearchInputFocused && searchInput.value.length > 0) {
+                     suggestionsInner.innerHTML = '<div class="suggestion-item" style="color: var(--text-muted); cursor: default;">Fehler beim Laden der Suchergebnisse.</div>';
+                } else {
+                     suggestionsInner.innerHTML = '';
+                }
+                updateSearchState(); // Aktualisiert den Zustand des Containers
+            }
+        }
+
+        function displaySearxResults(results) {
+            suggestionsInner.innerHTML = '';
+
+            if (results && results.length > 0) {
+                results.forEach(result => {
+                    const suggestionItem = document.createElement('div');
+                    suggestionItem.classList.add('suggestion-item'); // Keep existing class for styling
+
+                    // Create an anchor tag for the title and link
+                    const titleLink = document.createElement('a');
+                    titleLink.href = result.url;
+                    titleLink.textContent = result.title;
+                    titleLink.target = '_blank'; // Open in new tab
+                    titleLink.style.color = 'var(--gemini-blue)'; // Style the link
+                    titleLink.style.textDecoration = 'none';
+
+                    // Create a paragraph for the content/snippet
+                    const contentP = document.createElement('p');
+                    contentP.textContent = result.content || (result.description || ''); // Use content, fallback to description or empty
+                    contentP.style.fontSize = '14px';
+                    contentP.style.color = 'var(--text-muted)';
+                    contentP.style.marginTop = '5px';
+                    contentP.style.marginBottom = '5px';
+
+                    suggestionItem.appendChild(titleLink);
+                    suggestionItem.appendChild(contentP);
+
+                    // When a result item is clicked, it should fill the search bar
+                    suggestionItem.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        searchInput.value = result.title; // Or another relevant field if preferred
+                        // suggestionsContainer.classList.remove('visible'); // Hide results after click
+                        updateSearchState();
+                        // searchInput.focus(); // No longer needed if we are not re-triggering suggestion fetch
+                    });
+                    suggestionsInner.appendChild(suggestionItem);
+                });
+            }
+            updateSearchState();
+        }
+
+        function generateSimpleSummary(texts, numSentences = 3) {
+            if (!texts || texts.length === 0) {
+                return "Keine Inhalte für die Zusammenfassung gefunden.";
+            }
+
+            // Combine all text snippets, prioritizing non-empty ones
+            const combinedText = texts.filter(text => text && text.trim() !== "").join(". ");
+
+            if (combinedText.trim() === "") {
+                return "Nicht genügend Inhalt für eine Zusammenfassung.";
+            }
+
+            // Split into sentences (simple split by period, question mark, exclamation mark)
+            const sentences = combinedText.split(/[.?!]/).filter(s => s.trim() !== "");
+
+            if (sentences.length === 0) {
+                return "Konnte keine Sätze im Text finden.";
+            }
+
+            // Take the first few sentences
+            const summary = sentences.slice(0, numSentences).join(". ") + ".";
+
+            return summary.length > 1 ? summary : "Konnte keine Zusammenfassung erstellen.";
+        }
+
+        // --- Event-Listener für Suchfeld ---
+        searchInput.addEventListener('input', () => {
+            clearTimeout(debounceTimeout);
+            debounceTimeout = setTimeout(() => {
+                fetchSearxResults(searchInput.value);
+            }, 300);
+
+            if (searchInput.value.length > 0) {
+                searchInput.placeholder = typingPlaceholder;
+            } else {
+                searchInput.placeholder = focusedPlaceholder;
+            }
+            updateSearchState(); // Für Glow und Clear-Button sofort
+        });
+
+        searchInput.addEventListener('focus', () => {
+            isSearchInputFocused = true;
+            if (searchInput.value.length === 0) {
+                searchInput.placeholder = focusedPlaceholder;
+            }
+            if (searchInput.value.length > 0) {
+                fetchSearxResults(searchInput.value);
+            }
+            updateSearchState(); // Glow und Vorschläge anzeigen
+        });
+
+        searchInput.addEventListener('blur', () => {
+            // Eine kleine Verzögerung, damit Klicks auf Vorschläge noch registriert werden
+            setTimeout(() => {
+                // Prüfen, ob der Fokus NICHT auf dem Vorschlagscontainer liegt
+                if (!suggestionsContainer.contains(document.activeElement)) {
+                    isSearchInputFocused = false;
+                    suggestionsInner.innerHTML = ''; // Vorschläge leeren
+                    if (searchInput.value.length === 0) {
+                        searchInput.placeholder = initialPlaceholder;
+                    }
+                    updateSearchState(); // Glow und Vorschläge ausblenden
+                }
+            }, 150);
+        });
+
+        clearSearchButton.addEventListener('click', () => {
+            searchInput.value = '';
+            suggestionsInner.innerHTML = '';
+            searchInput.focus();
+            updateSearchState();
+            searchInput.placeholder = focusedPlaceholder;
+        });
+
+        submitButton.addEventListener('click', async () => {
+            const searchTerm = searchInput.value.trim();
+
+            // Always hide live suggestions/results when submit is clicked
+            suggestionsContainer.classList.remove('visible');
+            suggestionsInner.innerHTML = '';
+
+            if (searchTerm === '') {
+                searchInput.placeholder = "Bitte gib einen Suchbegriff ein!";
+                aiSummaryContainer.style.display = 'none'; // Hide AI summary section
+                aiSummaryContent.innerHTML = '';
+                aiSummaryError.style.display = 'none';
+                aiSummaryLoading.style.display = 'none';
+                setTimeout(() => {
+                    if (searchInput.value === '') { // Check again in case user typed something
+                        searchInput.placeholder = initialPlaceholder;
+                    }
+                }, 2000);
+                return;
+            }
+
+            // Setup AI summary display for loading
+            aiSummaryContainer.style.display = 'block';
+            aiSummaryContent.innerHTML = '';
+            aiSummaryError.style.display = 'none';
+            aiSummaryLoading.textContent = 'Suche und fasse zusammen...'; // More descriptive loading
+            aiSummaryLoading.style.display = 'block';
+
+            try {
+                const searxUrl = `https://searx.nixnet.services/search?q=${encodeURIComponent(searchTerm)}&format=json&language=de`;
+                const response = await fetch(searxUrl);
+                if (!response.ok) {
+                    // More specific error for HTTP issues
+                    throw new Error(`Netzwerkantwort war nicht ok: ${response.status} ${response.statusText}`);
+                }
+                const data = await response.json();
+                const results = data.results;
+
+                if (results && results.length > 0) {
+                    const textsToSummarize = results.slice(0, 5)
+                                               .map(result => result.content || result.description || "")
+                                               .filter(text => text && text.trim() !== "");
+
+                    if (textsToSummarize.length > 0) {
+                        const summary = generateSimpleSummary(textsToSummarize, 3);
+                        // Consider using .textContent if summary is plain text
+                                                            // If summary can contain HTML, .innerHTML is fine.
+                                                            // For simple text, textContent is safer.
+                                                            // Given generateSimpleSummary, textContent is better.
+                        aiSummaryContent.textContent = summary;
+                    } else {
+                        aiSummaryContent.textContent = "Nicht genügend Inhalte in den Suchergebnissen für eine Zusammenfassung.";
+                    }
+                } else {
+                    aiSummaryContent.textContent = "Keine Suchergebnisse für diesen Begriff gefunden.";
+                }
+            } catch (error) {
+                console.error('Fehler bei der Suche oder Zusammenfassung:', error);
+                aiSummaryError.textContent = `Ein Fehler ist aufgetreten: ${error.message || "Unbekannter Fehler."}`;
+                aiSummaryError.style.display = 'block';
+                aiSummaryContent.innerHTML = ''; // Clear any partial content
+            } finally {
+                aiSummaryLoading.style.display = 'none'; // Always hide loading indicator
+                if (searchInput.value !== searchTerm && searchInput.value.trim() === '') {
+                     // If user cleared input while search was running
+                    searchInput.placeholder = initialPlaceholder;
+                } else if (searchInput.value.trim() !== '' && !isSearchInputFocused) {
+                    // If input has text but is not focused, keep placeholder as initial
+                    // This case might be complex due to isSearchInputFocused interactions
+                }
+                // Consider if searchInput.placeholder needs more specific resetting logic here
+                // For now, the empty check during timeout and initial empty check should cover most cases.
+            }
+        });
+
+        searchInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                submitButton.click();
+            }
+        });
+
+        // --- Sprach-Eingabe (Web Speech API) ---
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = false; // Erkennt nur eine Phrase pro Aufnahme
+            recognition.lang = 'de-DE'; // Sprache auf Deutsch setzen
+
+            voiceInputButton.addEventListener('click', () => {
+                if (voiceInputButton.classList.contains('recording')) {
+                    recognition.stop();
+                } else {
+                    recognition.start();
+                }
+            });
+
+            recognition.onstart = () => {
+                voiceInputButton.classList.add('recording');
+                searchInput.placeholder = listeningPlaceholder;
+                searchInput.value = ''; // Leere das Feld, um die neue Eingabe aufzunehmen
+                updateSearchState();
+            };
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                searchInput.value = transcript;
+                searchInput.focus(); // Fokus zurück ins Feld, um Glow und Vorschläge zu reaktivieren
+                updateSearchState(); // Aktualisiere den Zustand nach der Spracheingabe
+            };
+
+            recognition.onend = () => {
+                voiceInputButton.classList.remove('recording');
+                if (searchInput.value.length === 0) {
+                    searchInput.placeholder = focusedPlaceholder; // Setze Platzhalter zurück, wenn nichts erkannt wurde
+                }
+                updateSearchState(); // Zustand aktualisieren
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Spracherkennungsfehler:', event.error);
+                voiceInputButton.classList.remove('recording');
+                searchInput.placeholder = "Spracheingabe fehlgeschlagen oder nicht unterstützt.";
+                setTimeout(() => {
+                    if (searchInput.value.length === 0) {
+                        searchInput.placeholder = focusedPlaceholder; // Wiederherstellen
+                    }
+                }, 3000);
+            };
+        } else {
+            console.warn('Web Speech API wird in diesem Browser nicht unterstützt.');
+            voiceInputButton.style.display = 'none'; // Button ausblenden, wenn nicht unterstützt
+        }
+
+        // --- Einstellungen-Dropdown ---
+        settingsButton.addEventListener('click', (event) => {
+            event.stopPropagation(); // Verhindert, dass der Klick das Dropdown sofort wieder schließt
+            settingsDropdownContent.classList.toggle('visible');
+        });
+
+        // Schließt das Dropdown, wenn außerhalb geklickt wird
+        document.addEventListener('click', (event) => {
+            if (!settingsButton.contains(event.target) && !settingsDropdownContent.contains(event.target)) {
+                settingsDropdownContent.classList.remove('visible');
+            }
+        });
+
+        // Initialer Zustand beim Laden der Seite
+        updateSearchState();
+    </script>
+</body>
+</html>
