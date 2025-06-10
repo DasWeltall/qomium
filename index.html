@@ -133,6 +133,35 @@
             background-color: var(--button-bg-hover);
         }
 
+        .api-key-container {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--outline-color);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        #groq-api-key-input {
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid var(--outline-color);
+            background-color: var(--surface-dark);
+            color: var(--text-light);
+        }
+
+        #save-api-key-button {
+            padding: 8px;
+            border: none;
+            border-radius: 6px;
+            background-color: var(--gemini-blue);
+            color: #fff;
+            cursor: pointer;
+        }
+
+        #save-api-key-button:hover {
+            background-color: var(--gemini-purple);
+        }
+
         /* --- Zentrierter Hauptinhalt --- */
         .centered-content {
             display: flex;
@@ -479,6 +508,10 @@
                 <span class="material-icons">settings</span>
             </button>
             <div class="settings-dropdown-content" id="settings-dropdown-content">
+                <div class="api-key-container">
+                    <input type="text" id="groq-api-key-input" placeholder="Groq API-Schlüssel">
+                    <button id="save-api-key-button">Speichern</button>
+                </div>
                 <a href="#">Sprache ändern</a>
                 <a href="#">Theme wechseln</a>
                 <a href="#">Privatsphäre</a>
@@ -518,6 +551,12 @@
                 <p id="ai-summary-loading" style="color: var(--text-muted); display: none;">Zusammenfassung wird geladen...</p>
                 <p id="ai-summary-error" style="color: var(--gemini-pink); display: none;">Fehler beim Erstellen der Zusammenfassung.</p>
             </div>
+            <div id="recursive-container" style="margin-top: 20px; padding: 15px; background-color: var(--surface-dark); border-radius: 15px; box-shadow: var(--shadow-subtle); display: none; text-align: left;">
+                <h3 style="margin-top: 0; color: var(--gemini-purple);">Erweiterte Suche</h3>
+                <div id="recursive-results" style="font-size: 15px; line-height: 1.6;"></div>
+                <p id="recursive-loading" style="color: var(--text-muted); display: none;">Zusätzliche Ergebnisse werden geladen...</p>
+                <p id="recursive-error" style="color: var(--gemini-pink); display: none;">Fehler beim Abrufen zusätzlicher Ergebnisse.</p>
+            </div>
         </div>
     </div>
 
@@ -536,6 +575,12 @@
         const aiSummaryContent = document.getElementById('ai-summary-content');
         const aiSummaryLoading = document.getElementById('ai-summary-loading');
         const aiSummaryError = document.getElementById('ai-summary-error');
+        const recursiveContainer = document.getElementById("recursive-container");
+        const recursiveResults = document.getElementById("recursive-results");
+        const recursiveLoading = document.getElementById("recursive-loading");
+        const recursiveError = document.getElementById("recursive-error");
+        const groqApiKeyInput = document.getElementById('groq-api-key-input');
+        const saveApiKeyButton = document.getElementById('save-api-key-button');
 
         const initialPlaceholder = searchInput.placeholder;
         const typingPlaceholder = "Tippe deine Frage hier...";
@@ -545,6 +590,26 @@
         let debounceTimeout;
         let isSearchInputFocused = false; // Zustand, ob das Suchfeld fokussiert ist
         let recognition; // Für Web Speech API
+
+        function loadGroqApiKey() {
+            const key = localStorage.getItem('groqApiKey') || '';
+            if (groqApiKeyInput) {
+                groqApiKeyInput.value = key;
+            }
+            return key;
+        }
+
+        saveApiKeyButton.addEventListener('click', () => {
+            const key = groqApiKeyInput.value.trim();
+            if (key) {
+                localStorage.setItem('groqApiKey', key);
+            } else {
+                localStorage.removeItem('groqApiKey');
+            }
+            settingsDropdownContent.classList.remove('visible');
+        });
+
+        loadGroqApiKey();
 
         // --- Funktionen für Suchfeld und Vorschläge ---
         function updateSearchState() {
@@ -664,6 +729,107 @@
             return summary.length > 1 ? summary : "Konnte keine Zusammenfassung erstellen.";
         }
 
+        async function fetchGroqSummary(text, apiKey, sentences = 3) {
+            const body = {
+                model: 'llama3-70b-8192',
+                messages: [
+                    { role: 'system', content: `Fasse den folgenden Text in ${sentences} S\xE4tzen zusammen.` },
+                    { role: 'user', content: text }
+                ],
+                max_tokens: 256,
+                temperature: 0.2
+            };
+
+            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify(body)
+            });
+
+            if (!response.ok) {
+                throw new Error(`Groq API Fehler: ${response.status} ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            const msg = result && result.choices && result.choices[0] && result.choices[0].message;
+            if (msg && msg.content) {
+                return msg.content.trim();
+            }
+
+            throw new Error('Keine Zusammenfassung vom Groq API erhalten.');
+        }
+
+        async function fetchPageContent(url) {
+            const proxied = `https://r.jina.ai/${url}`;
+            const response = await fetch(proxied);
+            if (!response.ok) {
+                throw new Error(`Fehler beim Abrufen der Seite: ${response.status}`);
+            }
+            const html = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, "text/html");
+            const title = doc.querySelector("title") ? doc.querySelector("title").textContent : "";
+            const paragraphs = Array.from(doc.querySelectorAll("p")).slice(0, 2).map(p => p.textContent.trim()).join(" ");
+            return { title, paragraphs };
+        }
+
+        async function fetchRelatedResults(query) {
+            const url = `https://searx.nixnet.services/search?q=${encodeURIComponent(query)}&format=json&language=de`;
+            const resp = await fetch(url);
+            if (!resp.ok) {
+                throw new Error('Fehler bei weiterer Suche');
+            }
+            const data = await resp.json();
+            return data.results || [];
+        }
+
+        async function performRecursiveSearch(initialResults) {
+            recursiveContainer.style.display = 'block';
+            recursiveResults.innerHTML = '';
+            recursiveLoading.style.display = 'block';
+            recursiveError.style.display = 'none';
+            try {
+                for (const res of initialResults.slice(0, 3)) {
+                    let page;
+                    try {
+                        page = await fetchPageContent(res.url);
+                    } catch (pageErr) {
+                        console.warn('Fehler beim Abrufen der Seite', res.url, pageErr);
+                        continue;
+                    }
+                    if (!page.title) continue;
+                    const related = await fetchRelatedResults(page.title);
+                    const section = document.createElement('div');
+                    const headerLink = document.createElement('a');
+                    headerLink.href = res.url;
+                    headerLink.textContent = res.title;
+                    headerLink.target = '_blank';
+                    headerLink.style.color = 'var(--gemini-blue)';
+                    section.appendChild(headerLink);
+                    const list = document.createElement('ul');
+                    related.slice(0, 3).forEach(rel => {
+                        const li = document.createElement('li');
+                        const link = document.createElement('a');
+                        link.href = rel.url;
+                        link.textContent = rel.title;
+                        link.target = '_blank';
+                        link.style.color = 'var(--gemini-purple)';
+                        li.appendChild(link);
+                        list.appendChild(li);
+                    });
+                    section.appendChild(list);
+                    recursiveResults.appendChild(section);
+                }
+            } catch (err) {
+                recursiveError.textContent = `Fehler: ${err.message}`;
+                recursiveError.style.display = 'block';
+            } finally {
+                recursiveLoading.style.display = 'none';
+            }
+        }
         // --- Event-Listener für Suchfeld ---
         searchInput.addEventListener('input', () => {
             clearTimeout(debounceTimeout);
@@ -719,6 +885,10 @@
             // Always hide live suggestions/results when submit is clicked
             suggestionsContainer.classList.remove('visible');
             suggestionsInner.innerHTML = '';
+            recursiveContainer.style.display = "none";
+            recursiveResults.innerHTML = "";
+            recursiveError.style.display = "none";
+            recursiveLoading.style.display = "none";
 
             if (searchTerm === '') {
                 searchInput.placeholder = "Bitte gib einen Suchbegriff ein!";
@@ -726,6 +896,10 @@
                 aiSummaryContent.innerHTML = '';
                 aiSummaryError.style.display = 'none';
                 aiSummaryLoading.style.display = 'none';
+                recursiveContainer.style.display = "none";
+                recursiveResults.innerHTML = "";
+                recursiveError.style.display = "none";
+                recursiveLoading.style.display = "none";
                 setTimeout(() => {
                     if (searchInput.value === '') { // Check again in case user typed something
                         searchInput.placeholder = initialPlaceholder;
@@ -757,15 +931,27 @@
                                                .filter(text => text && text.trim() !== "");
 
                     if (textsToSummarize.length > 0) {
-                        const summary = generateSimpleSummary(textsToSummarize, 3);
-                        // Consider using .textContent if summary is plain text
-                                                            // If summary can contain HTML, .innerHTML is fine.
-                                                            // For simple text, textContent is safer.
-                                                            // Given generateSimpleSummary, textContent is better.
-                        aiSummaryContent.textContent = summary;
+                        const combined = textsToSummarize.join(' ');
+                        const key = loadGroqApiKey();
+                        if (key) {
+                            try {
+                                const summary = await fetchGroqSummary(combined, key, 3);
+                                aiSummaryContent.textContent = summary;
+                            } catch (apiError) {
+                                console.warn('Groq API fehlgeschlagen, nutze einfache Zusammenfassung:', apiError);
+                                const fallback = generateSimpleSummary(textsToSummarize, 3);
+                                aiSummaryContent.textContent = fallback;
+                            }
+                        } else {
+                            aiSummaryError.textContent = 'Bitte Groq API-Schlüssel in den Einstellungen eintragen.';
+                            aiSummaryError.style.display = 'block';
+                            const fallback = generateSimpleSummary(textsToSummarize, 3);
+                            aiSummaryContent.textContent = fallback;
+                        }
                     } else {
                         aiSummaryContent.textContent = "Nicht genügend Inhalte in den Suchergebnissen für eine Zusammenfassung.";
                     }
+                        await performRecursiveSearch(results);
                 } else {
                     aiSummaryContent.textContent = "Keine Suchergebnisse für diesen Begriff gefunden.";
                 }
