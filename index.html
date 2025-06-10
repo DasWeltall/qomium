@@ -472,6 +472,35 @@
                url(https://fonts.gstatic.com/s/googlesans/v27/4UabrENHsxJlGDuGo1OIlLV154s3gjN0.woff2) format('woff2');
           unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
         }
+
+        .api-key-container {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--outline-color);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        #groq-api-key-input {
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid var(--outline-color);
+            background-color: var(--surface-dark);
+            color: var(--text-light);
+        }
+
+        #save-api-key-button {
+            padding: 8px;
+            border: none;
+            border-radius: 6px;
+            background-color: var(--gemini-blue);
+            color: #fff;
+            cursor: pointer;
+        }
+
+        #save-api-key-button:hover {
+            background-color: var(--gemini-purple);
+        }
     </style>
 </head>
 <body>
@@ -481,6 +510,10 @@
                 <span class="material-icons">settings</span>
             </button>
             <div class="settings-dropdown-content" id="settings-dropdown-content">
+                                <div class="api-key-container">
+                    <input type="text" id="groq-api-key-input" placeholder="Groq API-Schlüssel">
+                    <button id="save-api-key-button">Speichern</button>
+                </div>
                 <a href="#">Sprache ändern</a>
                 <a href="#">Theme wechseln</a>
                 <a href="#">Privatsphäre</a>
