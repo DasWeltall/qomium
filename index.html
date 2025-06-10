@@ -699,16 +699,15 @@
             return summary.length > 1 ? summary : "Konnte keine Zusammenfassung erstellen.";
         }
 
-        async function fetchMeaningCloudSummary(text, sentences = 3) {
-            const apiKey = 'YOUR_MEANINGCLOUD_API_KEY'; // Replace with your free MeaningCloud key
+        async function fetchSmmrySummary(text, sentences = 3) {
+            const apiKey = 'YOUR_SMMRY_API_KEY'; // Replace with your SMMRY API key
             const params = new URLSearchParams();
-            params.append('key', apiKey);
-            params.append('txt', text);
-            params.append('sentences', sentences);
+            params.append('sm_api_input', text);
 
-            const response = await fetch('https://api.meaningcloud.com/summarization-1.0', {
+            const url = `https://api.smmry.com?SM_API_KEY=${apiKey}&SM_LENGTH=${sentences}`;
+            const response = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Expect': '' },
                 body: params.toString()
             });
 
@@ -717,8 +716,8 @@
             }
 
             const result = await response.json();
-            if (result && result.summary) {
-                return result.summary;
+            if (result && result.sm_api_content) {
+                return result.sm_api_content;
             }
 
             throw new Error('Keine Zusammenfassung vom API erhalten.');
@@ -819,7 +818,7 @@
                     if (textsToSummarize.length > 0) {
                         const combined = textsToSummarize.join(' ');
                         try {
-                            const summary = await fetchMeaningCloudSummary(combined, 3);
+                            const summary = await fetchSmmrySummary(combined, 3);
                             aiSummaryContent.textContent = summary;
                         } catch (apiError) {
                             console.warn('Summarization API fehlgeschlagen, nutze einfache Zusammenfassung:', apiError);
