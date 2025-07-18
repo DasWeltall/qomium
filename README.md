@@ -1,6 +1,6 @@
 # Qomium - Advanced Meta Search Engine
 
-**Qomium** is an advanced meta search engine project that leverages [SearxNG](https://github.com/searxng/searxng) to provide fast and flexible search capabilities.  
+**Qomium** is an advanced meta search engine project that leverages [SearXNG](https://github.com/searxng/searxng) to provide fast and flexible search capabilities.  
 With Qomium, you can search for images, videos, news, and much more—all in one place.  
 Additionally, Qomium can generate AI-powered summaries of your search results using the Groq API.
 
@@ -23,7 +23,7 @@ To enable AI summaries, you need to add your Groq API key in the settings:
 
 - Enter your search query.
 - Select the category (web, images, videos, news, etc.).
-- Qomium fetches results from multiple sources using SearxNG.
+- Qomium fetches results from multiple sources using SearXNG.
 - (Optional) Enable AI summary for a quick overview of the results.
 
 ## Technologies Used
@@ -34,7 +34,7 @@ To enable AI summaries, you need to add your Groq API key in the settings:
 
 ## Getting Started
 
-You can use [Qomium](https://dasweltall.github.io/qomium/) directly from your browser.  
+Qomium can be used on a server with PHP installed. 
 To enable AI summaries, make sure to add your Groq API key in the settings.
 
 ## Related Projects
